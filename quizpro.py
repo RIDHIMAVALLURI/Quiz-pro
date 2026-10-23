@@ -1,316 +1,188 @@
-
+import re
 import time
-import json
-import os
+import random
 
-# Store quiz questions
+RECORD_FILE = "quiz_records.txt"
+TOTAL_QUESTIONS = 10
+
+
+def q(question, correct, wrong1, wrong2, wrong3):
+    """Builds one question dictionary. The correct answer is listed first and
+    the options are shuffled later when the question is displayed."""
+    return {"question": question, "options": [correct, wrong1, wrong2, wrong3]}
+
+
+# ---------------------------------------------------------------
+# Question bank: dictionary -> subject -> difficulty -> list of dictionaries
+# ---------------------------------------------------------------
 questions = {
     "Maths": {
         "Easy": [
-            {
-                "question": "What is 5 + 7?",
-                "options": ["A. 10", "B. 12", "C. 13", "D. 14"],
-                "answer": "B"
-            },
-            {
-                "question": "What is 6 x 6?",
-                "options": ["A. 30", "B. 36", "C. 42", "D. 48"],
-                "answer": "B"
-            },
-            {
-                "question": "What is 20 / 4?",
-                "options": ["A. 4", "B. 5", "C. 6", "D. 8"],
-                "answer": "B"
-            },
-            {
-                "question": "What is 15 - 8?",
-                "options": ["A. 5", "B. 6", "C. 7", "D. 8"],
-                "answer": "C"
-            },
-            {
-                "question": "What is 9 + 9?",
-                "options": ["A. 16", "B. 17", "C. 18", "D. 19"],
-                "answer": "C"
-            }
+            q("What is 5 + 7?", "12", "10", "13", "14"),
+            q("What is 6 x 6?", "36", "30", "42", "48"),
+            q("What is 20 / 4?", "5", "4", "6", "8"),
+            q("What is 15 - 8?", "7", "5", "6", "8"),
+            q("What is 9 + 9?", "18", "16", "17", "19"),
+            q("What is 8 x 7?", "56", "54", "58", "64"),
+            q("What is 100 - 45?", "55", "45", "65", "75"),
+            q("What is 3 x 9?", "27", "24", "26", "30"),
+            q("What is 81 / 9?", "9", "7", "8", "10"),
+            q("What is 14 + 27?", "41", "39", "43", "45"),
         ],
-
         "Medium": [
-            {
-                "question": "What is 12 x 12?",
-                "options": ["A. 124", "B. 144", "C. 154", "D. 164"],
-                "answer": "B"
-            },
-            {
-                "question": "What is 25% of 200?",
-                "options": ["A. 25", "B. 40", "C. 50", "D. 75"],
-                "answer": "C"
-            },
-            {
-                "question": "What is the HCF of 12 and 18?",
-                "options": ["A. 2", "B. 3", "C. 6", "D. 9"],
-                "answer": "C"
-            },
-            {
-                "question": "What is 2^3 + 3^2?",
-                "options": ["A. 15", "B. 17", "C. 18", "D. 20"],
-                "answer": "B"
-            },
-            {
-                "question": "What is the average of 10, 20 and 30?",
-                "options": ["A. 15", "B. 20", "C. 25", "D. 30"],
-                "answer": "B"
-            }
+            q("What is 12 x 12?", "144", "124", "154", "164"),
+            q("What is 25% of 200?", "50", "25", "40", "75"),
+            q("What is the HCF of 12 and 18?", "6", "2", "3", "9"),
+            q("What is 2^3 + 3^2?", "17", "15", "18", "20"),
+            q("What is the average of 10, 20 and 30?", "20", "15", "25", "30"),
+            q("What is the LCM of 4 and 6?", "12", "10", "18", "24"),
+            q("What is 15% of 300?", "45", "30", "35", "40"),
+            q("Solve for x: 3x + 5 = 20", "5", "3", "4", "6"),
+            q("What is the area of a rectangle with sides 8 and 5?", "40", "26", "13", "45"),
+            q("What is the next prime number after 7?", "11", "9", "13", "15"),
         ],
-
         "Hard": [
-            {
-                "question": "What is the derivative of x^2?",
-                "options": ["A. x", "B. 2x", "C. x^2", "D. 2"],
-                "answer": "B"
-            },
-            {
-                "question": "What is 2^5?",
-                "options": ["A. 16", "B. 24", "C. 32", "D. 64"],
-                "answer": "C"
-            },
-            {
-                "question": "What is the square root of 144?",
-                "options": ["A. 10", "B. 11", "C. 12", "D. 14"],
-                "answer": "C"
-            },
-            {
-                "question": "What is 15 x 8?",
-                "options": ["A. 100", "B. 110", "C. 120", "D. 130"],
-                "answer": "C"
-            },
-            {
-                "question": "What is 100 divided by 4?",
-                "options": ["A. 20", "B. 25", "C. 30", "D. 40"],
-                "answer": "B"
-            }
-        ]
+            q("What is the derivative of x^2?", "2x", "x", "x^2", "2"),
+            q("What is 2^5?", "32", "16", "24", "64"),
+            q("What is the square root of 144?", "12", "10", "11", "14"),
+            q("What is 15 x 8?", "120", "100", "110", "130"),
+            q("What is the integral of 2x dx?", "x^2 + C", "2 + C", "x + C", "2x^2 + C"),
+            q("What is the value of sin 90 degrees?", "1", "0", "1/2", "-1"),
+            q("What is log10(1000)?", "3", "2", "4", "10"),
+            q("What are the roots of x^2 - 5x + 6 = 0?", "2 and 3", "1 and 6", "-2 and -3", "1 and 5"),
+            q("What is the value of 5! (5 factorial)?", "120", "60", "100", "150"),
+            q("What is the derivative of sin x?", "cos x", "-cos x", "-sin x", "tan x"),
+        ],
     },
-
     "Physics": {
         "Easy": [
-            {
-                "question": "What is the SI unit of force?",
-                "options": ["A. Joule", "B. Newton", "C. Watt", "D. Pascal"],
-                "answer": "B"
-            },
-            {
-                "question": "What is the SI unit of energy?",
-                "options": ["A. Joule", "B. Newton", "C. Watt", "D. Volt"],
-                "answer": "A"
-            },
-            {
-                "question": "Which force pulls objects towards Earth?",
-                "options": ["A. Friction", "B. Gravity", "C. Tension", "D. Magnetic force"],
-                "answer": "B"
-            },
-            {
-                "question": "Which instrument is used to measure temperature?",
-                "options": ["A. Ammeter", "B. Barometer", "C. Thermometer", "D. Voltmeter"],
-                "answer": "C"
-            },
-            {
-                "question": "What is the SI unit of power?",
-                "options": ["A. Joule", "B. Watt", "C. Newton", "D. Pascal"],
-                "answer": "B"
-            }
+            q("What is the SI unit of force?", "Newton", "Joule", "Watt", "Pascal"),
+            q("What is the SI unit of energy?", "Joule", "Newton", "Watt", "Volt"),
+            q("Which force pulls objects towards Earth?", "Gravity", "Friction", "Tension", "Magnetic force"),
+            q("Which instrument is used to measure temperature?", "Thermometer", "Ammeter", "Barometer", "Voltmeter"),
+            q("What is the SI unit of power?", "Watt", "Joule", "Newton", "Pascal"),
+            q("What is the approximate speed of light?", "3 x 10^8 m/s", "3 x 10^6 m/s", "300 m/s", "3 x 10^5 m/s"),
+            q("Which of these is a source of light?", "Sun", "Moon", "Mirror", "Planet"),
+            q("What is the SI unit of frequency?", "Hertz", "Metre", "Second", "Kelvin"),
+            q("Sound cannot travel through which of these?", "Vacuum", "Water", "Steel", "Air"),
+            q("Which instrument measures electric current?", "Ammeter", "Voltmeter", "Barometer", "Thermometer"),
         ],
-
         "Medium": [
-            {
-                "question": "What is Newton's second law?",
-                "options": ["A. F = ma", "B. E = mc^2", "C. V = IR", "D. P = VI"],
-                "answer": "A"
-            },
-            {
-                "question": "What is the unit of resistance?",
-                "options": ["A. Volt", "B. Ampere", "C. Ohm", "D. Watt"],
-                "answer": "C"
-            },
-            {
-                "question": "What is the formula for kinetic energy?",
-                "options": ["A. mgh", "B. 1/2 mv^2", "C. ma", "D. Fd"],
-                "answer": "B"
-            },
-            {
-                "question": "What is the SI unit of electric current?",
-                "options": ["A. Ampere", "B. Volt", "C. Ohm", "D. Watt"],
-                "answer": "A"
-            },
-            {
-                "question": "Which device converts electrical energy into mechanical energy?",
-                "options": ["A. Motor", "B. Battery", "C. Generator", "D. Transformer"],
-                "answer": "A"
-            }
+            q("What is Newton's second law?", "F = ma", "E = mc^2", "V = IR", "P = VI"),
+            q("What is the unit of resistance?", "Ohm", "Volt", "Ampere", "Watt"),
+            q("What is the formula for kinetic energy?", "1/2 mv^2", "mgh", "ma", "Fd"),
+            q("What is the SI unit of electric current?", "Ampere", "Volt", "Ohm", "Watt"),
+            q("Which device converts electrical energy into mechanical energy?", "Motor", "Battery", "Generator", "Transformer"),
+            q("Which formula represents Ohm's law?", "V = IR", "P = VI", "F = ma", "E = mc^2"),
+            q("What is the acceleration due to gravity on Earth?", "9.8 m/s^2", "1.6 m/s^2", "8.9 m/s^2", "10.8 m/s^2"),
+            q("Which lens is used to correct short-sightedness?", "Concave", "Convex", "Plane", "Cylindrical"),
+            q("What is the formula for momentum?", "mv", "m/v", "m + v", "m - v"),
+            q("What is the SI unit of pressure?", "Pascal", "Newton", "Joule", "Watt"),
         ],
-
         "Hard": [
-            {
-                "question": "What is the SI unit of electric charge?",
-                "options": ["A. Coulomb", "B. Ampere", "C. Ohm", "D. Tesla"],
-                "answer": "A"
-            },
-            {
-                "question": "What is the formula for Ohm's law?",
-                "options": ["A. V = IR", "B. F = ma", "C. P = VI", "D. E = mc^2"],
-                "answer": "A"
-            },
-            {
-                "question": "What is the approximate acceleration due to gravity on Earth?",
-                "options": ["A. 4.9 m/s^2", "B. 9.8 m/s^2", "C. 15 m/s^2", "D. 20 m/s^2"],
-                "answer": "B"
-            },
-            {
-                "question": "Which quantity is measured in hertz?",
-                "options": ["A. Force", "B. Energy", "C. Frequency", "D. Power"],
-                "answer": "C"
-            },
-            {
-                "question": "What is the SI unit of magnetic flux?",
-                "options": ["A. Tesla", "B. Weber", "C. Henry", "D. Volt"],
-                "answer": "B"
-            }
-        ]
+            q("What is Einstein's mass-energy relation?", "E = mc^2", "E = mc", "E = m^2c", "E = 2mc"),
+            q("What is the approximate escape velocity from Earth?", "11.2 km/s", "7.9 km/s", "3 km/s", "25 km/s"),
+            q("The Heisenberg uncertainty principle relates which two quantities?", "Position and momentum", "Mass and energy", "Charge and current", "Speed and time"),
+            q("Lenz's law is based on the conservation of which quantity?", "Energy", "Mass", "Charge", "Momentum"),
+            q("Which particle carries the electromagnetic force?", "Photon", "Gluon", "Graviton", "W boson"),
+            q("What is the time period of a simple pendulum?", "2 pi sqrt(l/g)", "2 pi sqrt(g/l)", "2 pi l g", "pi sqrt(l/g)"),
+            q("What is the work done by the centripetal force in uniform circular motion?", "Zero", "Maximum", "Positive", "Negative"),
+            q("What is the power of a lens with focal length 0.5 m?", "2 D", "0.5 D", "1 D", "5 D"),
+            q("Which phenomenon proves the wave nature of light?", "Interference", "Photoelectric effect", "Compton effect", "Emission of X-rays"),
+            q("What is the SI unit of magnetic flux?", "Weber", "Tesla", "Henry", "Farad"),
+        ],
     },
-
     "Python": {
         "Easy": [
-            {
-                "question": "Which keyword is used to define a function?",
-                "options": ["A. function", "B. define", "C. def", "D. fun"],
-                "answer": "C"
-            },
-            {
-                "question": "Which symbol is used for comments in Python?",
-                "options": ["A. //", "B. #", "C. /*", "D. --"],
-                "answer": "B"
-            },
-            {
-                "question": "Which data type stores True or False?",
-                "options": ["A. int", "B. str", "C. bool", "D. float"],
-                "answer": "C"
-            },
-            {
-                "question": "Which function is used to display output?",
-                "options": ["A. display()", "B. output()", "C. print()", "D. show()"],
-                "answer": "C"
-            },
-            {
-                "question": "Which brackets are used for a list?",
-                "options": ["A. ()", "B. {}", "C. []", "D. <>"],
-                "answer": "C"
-            }
+            q("Which keyword is used to define a function?", "def", "function", "define", "fun"),
+            q("Which symbol is used for comments in Python?", "#", "//", "/*", "--"),
+            q("Which data type stores True or False?", "bool", "int", "str", "float"),
+            q("Which function is used to display output?", "print()", "display()", "output()", "show()"),
+            q("Which brackets are used for a list?", "[]", "()", "{}", "<>"),
+            q("Which data type is used to store text?", "str", "int", "float", "bool"),
+            q("What is the output of print(5 // 2)?", "2", "2.5", "3", "2.0"),
+            q("Which operator is used for exponent (power)?", "**", "^", "//", "%"),
+            q("Which function is used to take input from the user?", "input()", "read()", "scan()", "get()"),
+            q("What is the file extension of a Python file?", ".py", ".pt", ".pyt", ".python"),
         ],
-
         "Medium": [
-            {
-                "question": "Which data structure stores key-value pairs?",
-                "options": ["A. List", "B. Tuple", "C. Dictionary", "D. Set"],
-                "answer": "C"
-            },
-            {
-                "question": "What does len() return?",
-                "options": ["A. Data type", "B. Length", "C. Index", "D. Memory"],
-                "answer": "B"
-            },
-            {
-                "question": "Which keyword is used for exception handling?",
-                "options": ["A. try", "B. check", "C. error", "D. catch"],
-                "answer": "A"
-            },
-            {
-                "question": "Which loop is used to iterate over a sequence?",
-                "options": ["A. repeat", "B. for", "C. loop", "D. iterate"],
-                "answer": "B"
-            },
-            {
-                "question": "Which method adds an item to the end of a list?",
-                "options": ["A. add()", "B. insertEnd()", "C. append()", "D. push()"],
-                "answer": "C"
-            }
+            q("Which data structure stores key-value pairs?", "Dictionary", "List", "Tuple", "Set"),
+            q("What does len() return?", "Length", "Data type", "Index", "Memory"),
+            q("Which keyword is used for exception handling?", "try", "check", "error", "catch"),
+            q("Which loop is used to iterate over a sequence?", "for", "repeat", "loop", "iterate"),
+            q("Which method adds an item to the end of a list?", "append()", "add()", "insertEnd()", "push()"),
+            q("Which of these creates a tuple?", "(1, 2)", "[1, 2]", "{1, 2}", "<1, 2>"),
+            q("What is the output of 'Hello'[1]?", "e", "H", "l", "o"),
+            q("Which keyword is used to exit a loop?", "break", "stop", "exit", "end"),
+            q("Which method converts a string to uppercase?", "upper()", "up()", "capitalize()", "caps()"),
+            q("Which file mode is used for appending data?", "'a'", "'r'", "'w'", "'x'"),
         ],
-
         "Hard": [
-            {
-                "question": "What is a lambda function?",
-                "options": ["A. Anonymous function", "B. Loop", "C. Class", "D. Module"],
-                "answer": "A"
-            },
-            {
-                "question": "Which concept allows one class to acquire properties of another?",
-                "options": ["A. Encapsulation", "B. Inheritance", "C. Iteration", "D. Looping"],
-                "answer": "B"
-            },
-            {
-                "question": "What is the purpose of __init__()?",
-                "options": ["A. Delete an object", "B. Initialize an object", "C. Print an object", "D. Import a module"],
-                "answer": "B"
-            },
-            {
-                "question": "Which keyword is used to create a class?",
-                "options": ["A. object", "B. define", "C. class", "D. create"],
-                "answer": "C"
-            },
-            {
-                "question": "Which keyword is used to return a value from a function?",
-                "options": ["A. print", "B. return", "C. yield", "D. break"],
-                "answer": "B"
-            }
-        ]
-    }
+            q("What is a lambda function?", "Anonymous function", "Loop", "Class", "Module"),
+            q("Which concept allows one class to acquire properties of another?", "Inheritance", "Encapsulation", "Iteration", "Looping"),
+            q("What is the purpose of _init_()?", "Initialize an object", "Delete an object", "Print an object", "Copy an object"),
+            q("What is the output of [x * 2 for x in range(3)]?", "[0, 2, 4]", "[2, 4, 6]", "[0, 1, 2]", "[1, 2, 3]"),
+            q("Which of these is immutable?", "tuple", "list", "dict", "set"),
+            q("What does 'self' represent in a class method?", "The current object", "The class", "A module", "A function"),
+            q("Which keyword is used to create a generator function?", "yield", "return", "generate", "next"),
+            q("What is the average time complexity of a dictionary lookup?", "O(1)", "O(n)", "O(log n)", "O(n^2)"),
+            q("What does the 'with' statement ensure when handling files?", "File is closed automatically", "File is encrypted", "File is read only", "File is deleted"),
+            q("What is the output of bool([])?", "False", "True", "None", "Error"),
+        ],
+    },
 }
 
 
-# File used to store student records
-RECORD_FILE = "quiz_records.json"
-
-
-# Load previous records
-def load_records():
-    if os.path.exists(RECORD_FILE):
-        try:
-            with open(RECORD_FILE, "r") as file:
-                return json.load(file)
-        except (json.JSONDecodeError, OSError):
-            return {}
-
-    return {}
-
-
-# Save student records
-def save_records(records):
-    with open(RECORD_FILE, "w") as file:
-        json.dump(records, file, indent=4)
-
-
-# Student login
-def login():
+# ---------------------------------------------------------------
+# Login with regular expressions
+# ---------------------------------------------------------------
+def get_name():
     while True:
-        email = input("Enter your email ID: ").strip()
+        name = input("Enter your name: ").strip()
+        if re.fullmatch(r"[A-Za-z][A-Za-z .]{1,48}", name):
+            return name
+        print("Invalid name. Use only letters and spaces (at least 2 characters).\n")
 
-        if "@" in email and "." in email.split("@")[-1]:
-            print("Login successful!")
+
+def get_reg_no():
+    while True:
+        reg_no = input("Enter your registration number: ").strip().upper()
+        if reg_no != "" and "|" not in reg_no:
+            return reg_no
+        print("Registration number cannot be empty.\n")
+
+
+def get_email():
+    pattern = r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"
+    while True:
+        email = input("Enter your email ID: ").strip().lower()
+        if re.fullmatch(pattern, email):
             return email
+        print("Invalid email ID. Please enter a valid email.\n")
 
-        print("Invalid email ID. Please enter a valid email.")
+
+def login():
+    print("\n====================================")
+    print("              QUIZPRO")
+    print("       Python Quiz Application")
+    print("====================================\n")
+    name = get_name()
+    reg_no = get_reg_no()
+    email = get_email()
+    print("\nLogin successful! Welcome,", name)
+    return {"name": name, "reg_no": reg_no, "email": email}
 
 
-# Select subject
+# ---------------------------------------------------------------
+# Menus
+# ---------------------------------------------------------------
 def select_subject():
     subjects = ["Maths", "Physics", "Python"]
-
     while True:
         print("\n========== SELECT SUBJECT ==========")
-
         for i in range(len(subjects)):
             print(i + 1, ".", subjects[i])
-
         choice = input("Enter your choice: ").strip()
-
         if choice == "1":
             return "Maths"
         elif choice == "2":
@@ -321,18 +193,13 @@ def select_subject():
             print("Please select a valid subject.")
 
 
-# Select difficulty
 def select_difficulty():
     difficulties = ["Easy", "Medium", "Hard"]
-
     while True:
         print("\n========== SELECT DIFFICULTY ==========")
-
         for i in range(len(difficulties)):
             print(i + 1, ".", difficulties[i])
-
         choice = input("Enter your choice: ").strip()
-
         if choice == "1":
             return "Easy"
         elif choice == "2":
@@ -343,141 +210,139 @@ def select_difficulty():
             print("Please select a valid difficulty.")
 
 
-# Start the quiz
-def start_quiz(email):
+# ---------------------------------------------------------------
+# Quiz
+# ---------------------------------------------------------------
+def start_quiz(user):
     subject = select_subject()
     difficulty = select_difficulty()
-
-    question_list = questions[subject][difficulty]
+    question_list = questions[subject][difficulty][:]
+    random.shuffle(question_list)
     score = 0
 
     print("\n====================================")
     print("            QUIZ STARTED")
     print("====================================")
-    print("Student Email :", email)
-    print("Subject       :", subject)
-    print("Difficulty    :", difficulty)
-    print("Total Questions:", len(question_list))
+    print("Student Name   :", user["name"])
+    print("Reg. Number    :", user["reg_no"])
+    print("Student Email  :", user["email"])
+    print("Subject        :", subject)
+    print("Difficulty     :", difficulty)
+    print("Total Questions:", TOTAL_QUESTIONS)
     print("====================================")
 
     start_time = time.time()
 
-    for number, q in enumerate(question_list, start=1):
-        print("\nQuestion", number, "of", len(question_list))
-        print(q["question"])
+    for number in range(TOTAL_QUESTIONS):
+        q_item = question_list[number]
+        options = q_item["options"][:]
+        correct_text = options[0]
+        random.shuffle(options)
+        letters = ["A", "B", "C", "D"]
+        correct_letter = letters[options.index(correct_text)]
 
-        for option in q["options"]:
-            print(option)
+        print("\nQuestion", number + 1, "of", TOTAL_QUESTIONS)
+        print(q_item["question"])
+        for i in range(4):
+            print(letters[i] + ".", options[i])
 
         while True:
-            answer = input(
-                "\nEnter your answer (A/B/C/D): "
-            ).strip().upper()
-
-            if answer in ["A", "B", "C", "D"]:
+            answer = input("\nEnter your answer (A/B/C/D): ").strip().upper()
+            if answer in letters:
                 break
+            print("Invalid input. Please enter A, B, C or D.")
 
-            print("Invalid answer. Please enter A, B, C, or D.")
-
-        if answer == q["answer"]:
-            print("Correct answer!")
+        if answer == correct_letter:
+            print("Correct!")
             score += 1
         else:
-            print("Incorrect answer!")
-            print("Correct answer:", q["answer"])
+            print("Wrong! Correct answer is " + correct_letter + ".")
 
     end_time = time.time()
-
     time_taken = round(end_time - start_time, 2)
-    total_questions = len(question_list)
-    percentage = (score / total_questions) * 100
+    percentage = round((score / TOTAL_QUESTIONS) * 100, 1)
 
+    return subject, difficulty, score, percentage, time_taken
+
+
+# ---------------------------------------------------------------
+# Result and file handling
+# ---------------------------------------------------------------
+def display_result(user, subject, difficulty, score, percentage, time_taken):
     print("\n====================================")
-    print("             QUIZ RESULT")
+    print("            QUIZ RESULT")
     print("====================================")
-    print("Student Email :", email)
+    print("Student Name  :", user["name"])
+    print("Reg. Number   :", user["reg_no"])
+    print("Student Email :", user["email"])
     print("Subject       :", subject)
     print("Difficulty    :", difficulty)
-    print("Score         :", score, "/", total_questions)
-    print("Percentage    :", round(percentage, 2), "%")
-    print("Time Taken    :", time_taken, "seconds")
+    print("Score         : " + str(score) + "/" + str(TOTAL_QUESTIONS))
+    print("Percentage    : " + str(percentage) + "%")
+    print("Time Taken    : " + str(time_taken) + " seconds")
     print("====================================")
 
-    # Save the result in the student's record
-    records = load_records()
 
-    if email not in records:
-        records[email] = []
-
-    result = {
-        "subject": subject,
-        "difficulty": difficulty,
-        "score": score,
-        "total_questions": total_questions,
-        "percentage": round(percentage, 2),
-        "time_taken": time_taken
-    }
-
-    records[email].append(result)
-    save_records(records)
-
-    print("Your quiz result has been saved!")
+def save_record(user, subject, difficulty, score, percentage, time_taken):
+    record = [user["email"], user["name"], user["reg_no"], subject, difficulty,
+              str(score), str(percentage), str(time_taken)]
+    try:
+        with open(RECORD_FILE, "a") as file:
+            file.write("|".join(record) + "\n")
+        print("\nQuiz record saved successfully!")
+    except OSError:
+        print("\nSorry, the record could not be saved.")
 
 
-# View previous quiz records
-def view_history(email):
-    records = load_records()
+def view_previous_scores(user):
+    found = False
+    try:
+        with open(RECORD_FILE, "r") as file:
+            lines = file.readlines()
+    except FileNotFoundError:
+        lines = []
 
-    print("\n========== QUIZ HISTORY ==========")
-
-    if email not in records or not records[email]:
-        print("No previous quiz records found.")
-        return
-
-    for i, result in enumerate(records[email], start=1):
-        print("\nAttempt:", i)
-        print("Subject    :", result["subject"])
-        print("Difficulty :", result["difficulty"])
-        print(
-            "Score      :",
-            result["score"],
-            "/",
-            result["total_questions"]
-        )
-        print("Percentage :", result["percentage"], "%")
-        print("Time Taken :", result["time_taken"], "seconds")
+    print("\n====================================")
+    print("          PREVIOUS SCORES")
+    print("====================================")
+    for line in lines:
+        parts = line.strip().split("|")
+        if len(parts) == 8 and parts[0] == user["email"]:
+            found = True
+            print("\nSubject    :", parts[3])
+            print("Difficulty :", parts[4])
+            print("Score      : " + parts[5] + "/" + str(TOTAL_QUESTIONS))
+            print("Percentage : " + parts[6] + "%")
+            print("Time Taken : " + parts[7] + " seconds")
+            print("------------------------------------")
+    if not found:
+        print("\nNo previous records found for", user["email"])
 
 
+# ---------------------------------------------------------------
 # Main program
+# ---------------------------------------------------------------
 def main():
-    print("====================================")
-    print("          WELCOME TO QUIZPRO")
-    print("====================================")
-
-    email = login()
-
+    user = login()
     while True:
         print("\n========== MAIN MENU ==========")
         print("1. Start Quiz")
-        print("2. View Quiz History")
+        print("2. View Previous Scores")
         print("3. Exit")
-
+        print("===============================")
         choice = input("Enter your choice: ").strip()
 
         if choice == "1":
-            start_quiz(email)
-
+            subject, difficulty, score, percentage, time_taken = start_quiz(user)
+            display_result(user, subject, difficulty, score, percentage, time_taken)
+            save_record(user, subject, difficulty, score, percentage, time_taken)
         elif choice == "2":
-            view_history(email)
-
+            view_previous_scores(user)
         elif choice == "3":
-            print("Thank you for using QuizPro!")
+            print("\nThank you for using QuizPro!")
             break
-
         else:
-            print("Invalid choice. Please select 1, 2, or 3.")
+            print("Please select 1, 2 or 3.")
 
 
-# Run the application
-if __name__ == "__main__":
-    main()
+main()
